@@ -34,6 +34,7 @@ export default function TripSheetPage() {
 
     // --- State ---
     const [truckId, setTruckId] = useState("");
+    const [truckWarning, setTruckWarning] = useState<string | null>(null);
     const [dates, setDates] = useState({ start: "", end: "" });
     const [selectedDrivers, setSelectedDrivers] = useState({ d1: "", d2: "" });
 
@@ -56,6 +57,29 @@ export default function TripSheetPage() {
     const [billingExpenses, setBillingExpenses] = useState<ExpenseItem[]>([{ title: "", amount: 0 }]);
     const [otherExpenses, setOtherExpenses] = useState<ExpenseItem[]>([{ title: "", amount: 0 }]);
     const [saving, setSaving] = useState(false);
+
+    // --- Check Active Trip on Selection ---
+    useEffect(() => {
+        if (!truckId) {
+            setTruckWarning(null);
+            return;
+        }
+
+        const checkActive = async () => {
+            const { data } = await supabase
+                .from('trips')
+                .select('id')
+                .eq('truck_id', truckId)
+                .eq('status', 'ongoing');
+
+            if (data && data.length > 0) {
+                setTruckWarning("⚠️ Active Trip Found! Complete it before creating new.");
+            } else {
+                setTruckWarning(null);
+            }
+        };
+        checkActive();
+    }, [truckId]);
 
     // --- Calculations ---
 
@@ -137,6 +161,21 @@ export default function TripSheetPage() {
 
         setSaving(true);
         try {
+            // Check for existing active trip for this truck
+            const { data: activeTrips, error: checkError } = await supabase
+                .from('trips')
+                .select('id')
+                .eq('truck_id', truckId)
+                .eq('status', 'ongoing');
+
+            if (checkError) throw checkError;
+
+            if (activeTrips && activeTrips.length > 0) {
+                alert(`Selected vehicle currently has an active trip (Trip ID: ${activeTrips[0].id}). Please complete the previous trip before creating a new schedule.`);
+                setSaving(false);
+                return;
+            }
+
             // 1. Create Trip
             const { data: tripData, error: tripError } = await supabase.from('trips').insert([{
                 truck_id: truckId,
@@ -254,6 +293,11 @@ export default function TripSheetPage() {
                                         <option key={t.id} value={t.id}>{t.truck_no}</option>
                                     ))}
                                 </select>
+                                {truckWarning && (
+                                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                                        <span className="text-xs font-bold text-red-600">{truckWarning}</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-2">
