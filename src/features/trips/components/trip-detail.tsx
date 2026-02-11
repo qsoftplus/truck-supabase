@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
-import { 
-  Plus, X, Trash2, Printer, Calculator, Truck, 
+import {
+  Plus, X, Trash2, Printer, Calculator, Truck,
   Users, Calendar, MapPin, FileText, DollarSign,
   Fuel, Percent, Package, CreditCard
 } from "lucide-react"
@@ -39,8 +39,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { 
-  createTrip, updateTrip, 
+import {
+  createTrip, updateTrip,
   createLoad, updateLoad, deleteLoad,
   createExpense, deleteExpense, deleteExpensesByTripId, createMultipleExpenses,
   validateTripDates, validateLoadingDate
@@ -57,6 +57,8 @@ const EXPENSE_CATEGORIES = [
   { id: "rto", label: "RTO & PC" },
   { id: "fastag", label: "Fastag" },
 ]
+
+const generateId = () => Math.random().toString(36).substring(2, 9)
 
 interface BillingItem {
   id: string
@@ -75,7 +77,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [driversList, setDriversList] = useState(drivers)
-  
+
   // Trip header form state
   const [tripData, setTripData] = useState({
     id: trip?.id || null,
@@ -120,15 +122,15 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
     rto_amount: 0,
     fastag_amount: 0,
   })
-  
+
   // Billing items (multiple)
   const [billingItems, setBillingItems] = useState<BillingItem[]>([
-    { id: crypto.randomUUID(), title: "", amount: 0 }
+    { id: generateId(), title: "", amount: 0 }
   ])
-  
+
   // Other expenses (multiple)
   const [otherExpenses, setOtherExpenses] = useState<BillingItem[]>([
-    { id: crypto.randomUUID(), title: "", amount: 0 }
+    { id: generateId(), title: "", amount: 0 }
   ])
 
   // Add driver dialog state
@@ -304,7 +306,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
           toast.error(result.error || "Failed to add load")
         }
       }
-      
+
       setIsAddLoadOpen(false)
       setEditingLoad(null)
       setLoadForm({
@@ -327,7 +329,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
   // Handle delete load
   const handleDeleteLoad = async (loadId: string) => {
     if (!confirm("Are you sure you want to delete this load?")) return
-    
+
     const result = await deleteLoad(loadId)
     if (result.success) {
       setLoads(prev => prev.filter(l => l.id !== loadId))
@@ -355,7 +357,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
 
   // Add billing item
   const addBillingItem = () => {
-    setBillingItems(prev => [...prev, { id: crypto.randomUUID(), title: "", amount: 0 }])
+    setBillingItems(prev => [...prev, { id: generateId(), title: "", amount: 0 }])
   }
 
   // Remove billing item
@@ -367,14 +369,14 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
 
   // Update billing item
   const updateBillingItem = (id: string, field: "title" | "amount", value: any) => {
-    setBillingItems(prev => prev.map(item => 
+    setBillingItems(prev => prev.map(item =>
       item.id === id ? { ...item, [field]: field === "amount" ? Number(value) : value } : item
     ))
   }
 
   // Add other expense
   const addOtherExpense = () => {
-    setOtherExpenses(prev => [...prev, { id: crypto.randomUUID(), title: "", amount: 0 }])
+    setOtherExpenses(prev => [...prev, { id: generateId(), title: "", amount: 0 }])
   }
 
   // Remove other expense
@@ -386,7 +388,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
 
   // Update other expense
   const updateOtherExpense = (id: string, field: "title" | "amount", value: any) => {
-    setOtherExpenses(prev => prev.map(item => 
+    setOtherExpenses(prev => prev.map(item =>
       item.id === id ? { ...item, [field]: field === "amount" ? Number(value) : value } : item
     ))
   }
@@ -414,7 +416,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
       tripData.end_date || null,
       tripData.id || undefined
     )
-    
+
     if (!dateValidation.valid) {
       toast.error(dateValidation.error)
       return
@@ -587,8 +589,8 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Truck No *</Label>
-              <Select 
-                value={tripData.truck_id} 
+              <Select
+                value={tripData.truck_id}
                 onValueChange={(val) => handleTripChange("truck_id", val)}
               >
                 <SelectTrigger>
@@ -624,8 +626,8 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
 
             <div className="space-y-2">
               <Label>Status</Label>
-              <Select 
-                value={tripData.status} 
+              <Select
+                value={tripData.status}
                 onValueChange={(val) => handleTripChange("status", val)}
               >
                 <SelectTrigger>
@@ -646,8 +648,8 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
                 <Users className="h-4 w-4" /> Driver 1 *
               </Label>
               <div className="flex gap-2">
-                <Select 
-                  value={tripData.driver1_id} 
+                <Select
+                  value={tripData.driver1_id}
                   onValueChange={(val) => handleTripChange("driver1_id", val)}
                 >
                   <SelectTrigger className="flex-1">
@@ -661,9 +663,9 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
                     ))}
                   </SelectContent>
                 </Select>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   size="icon"
                   onClick={() => openAddDriverDialog("driver1")}
                 >
@@ -677,8 +679,8 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
                 <Users className="h-4 w-4" /> Driver 2
               </Label>
               <div className="flex gap-2">
-                <Select 
-                  value={tripData.driver2_id || "none"} 
+                <Select
+                  value={tripData.driver2_id || "none"}
                   onValueChange={(val) => handleTripChange("driver2_id", val === "none" ? null : val)}
                 >
                   <SelectTrigger className="flex-1">
@@ -693,9 +695,9 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
                     ))}
                   </SelectContent>
                 </Select>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   size="icon"
                   onClick={() => openAddDriverDialog("driver2")}
                 >
@@ -758,8 +760,8 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
               <CardTitle>Loads / Singles</CardTitle>
               <Badge variant="secondary">{loads.length} singles</Badge>
             </div>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 setEditingLoad(null)
                 setLoadForm({
@@ -1105,8 +1107,8 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
         <Button variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
-        <Button 
-          onClick={handleSaveTrip} 
+        <Button
+          onClick={handleSaveTrip}
           disabled={loading}
           className="bg-indigo-600 hover:bg-indigo-700"
         >
@@ -1176,7 +1178,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
               </div>
               <div className="space-y-2">
                 <Label>Pay Term</Label>
-                <Select 
+                <Select
                   value={loadForm.pay_term}
                   onValueChange={(val: "To Pay" | "Advance") => setLoadForm(prev => ({ ...prev, pay_term: val }))}
                 >
