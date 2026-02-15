@@ -226,7 +226,7 @@ export function DashboardView() {
                         tickFormatter={(value) => formatCurrencyCompact(value)}
                       />
                       <Tooltip 
-                        formatter={(value: number) => [`₹${value.toLocaleString()}`, '']}
+                        formatter={(value: number | undefined) => [`₹${(value || 0).toLocaleString()}`, '']}
                         cursor={{ fill: 'transparent' }}
                       />
                       <Legend />
@@ -263,7 +263,7 @@ export function DashboardView() {
                           <Cell key={`cell-${index}`} fill={entry.fill || COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => `₹${value.toLocaleString()}`} />
+                      <Tooltip formatter={(value: number | undefined) => `₹${(value || 0).toLocaleString()}`} />
                       <Legend layout="vertical" align="right" verticalAlign="middle" />
                     </PieChart>
                   </ResponsiveContainer>
