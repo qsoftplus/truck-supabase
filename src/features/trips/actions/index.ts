@@ -166,6 +166,7 @@ export async function createTrip(input: any) {
 
   if (error) return { success: false, error: error.message }
   revalidatePath("/trip-sheet")
+  revalidatePath("/payment-status")
   return { success: true, data }
 }
 
@@ -201,6 +202,7 @@ export async function updateTrip(input: any) {
 
   if (error) return { success: false, error: error.message }
   revalidatePath("/trip-sheet")
+  revalidatePath("/payment-status")
   return { success: true, data }
 }
 
@@ -208,6 +210,7 @@ export async function deleteTrip(id: string) {
   const { error } = await supabaseAdmin.from("trips").delete().eq("id", id)
   if (error) return { success: false, error: error.message }
   revalidatePath("/trip-sheet")
+  revalidatePath("/payment-status")
   return { success: true }
 }
 
@@ -238,6 +241,7 @@ export async function createLoad(input: any) {
   const { data, error } = await supabaseAdmin.from("loads").insert(validated.data).select().single()
   if (error) return { success: false, error: error.message }
   revalidatePath("/trip-sheet")
+  revalidatePath("/payment-status")
   return { success: true, data }
 }
 
@@ -267,6 +271,7 @@ export async function updateLoad(input: any) {
   const { data, error } = await supabaseAdmin.from("loads").update(updates).eq("id", id).select().single()
   if (error) return { success: false, error: error.message }
   revalidatePath("/trip-sheet")
+  revalidatePath("/payment-status")
   return { success: true, data }
 }
 
@@ -274,6 +279,7 @@ export async function deleteLoad(id: string) {
   const { error } = await supabaseAdmin.from("loads").delete().eq("id", id)
   if (error) return { success: false, error: error.message }
   revalidatePath("/trip-sheet")
+  revalidatePath("/payment-status")
   return { success: true }
 }
 

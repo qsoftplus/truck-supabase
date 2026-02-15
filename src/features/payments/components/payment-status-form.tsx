@@ -26,15 +26,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { 
-  getTripsByTruck, 
-  getLoadsByTrip, 
-  updateLoadPayment,
-  upsertCourierDetails 
-} from "../actions"
+import { getTripsByTruck, getLoadsByTrip, updateLoadPayment, upsertCourierDetails } from "../actions"
+import { getTripById } from "@/features/trips/actions"
 
 interface PaymentStatusFormProps {
   trucks: any[]
+  initialTripId?: string | null
+  onSuccess?: () => void
 }
 
 interface LoadWithPayment {
@@ -48,7 +46,7 @@ interface LoadWithPayment {
   courier_details: any
 }
 
-export function PaymentStatusForm({ trucks }: PaymentStatusFormProps) {
+export function PaymentStatusForm({ trucks, initialTripId, onSuccess }: PaymentStatusFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   
@@ -68,13 +66,29 @@ export function PaymentStatusForm({ trucks }: PaymentStatusFormProps) {
     delivery_date: string
   }}>({})
 
+  // Handle initial trip ID (Pre-filling for Edit)
+  useEffect(() => {
+    async function loadInitialTrip() {
+      if (initialTripId) {
+        const result = await getTripById(initialTripId)
+        if (result.success && result.data) {
+          // Set truck first
+          setSelectedTruckId(result.data.truck_id)
+          // Set trip ID
+          setSelectedTripId(initialTripId)
+        }
+      }
+    }
+    loadInitialTrip()
+  }, [initialTripId])
+
   // Fetch trips when truck is selected
   useEffect(() => {
     if (selectedTruckId) {
       fetchTrips(selectedTruckId)
     } else {
       setTrips([])
-      setSelectedTripId("")
+      if (!initialTripId) setSelectedTripId("") // Only clear if not editing
       setLoads([])
     }
   }, [selectedTruckId])
@@ -83,8 +97,14 @@ export function PaymentStatusForm({ trucks }: PaymentStatusFormProps) {
   useEffect(() => {
     if (selectedTripId) {
       fetchLoads(selectedTripId)
-      const trip = trips.find(t => t.id === selectedTripId)
-      setSelectedTrip(trip)
+      // If trips are loaded, find the selected trip object
+      if (trips.length > 0) {
+        const trip = trips.find(t => t.id === selectedTripId)
+        setSelectedTrip(trip)
+      } else if (initialTripId === selectedTripId) {
+          // If editing and trips not yet loaded, we might need to rely on the fetch calls in parallel
+          // Ideally rely on the dependency array [selectedTripId, trips] to update this eventually
+      }
     } else {
       setLoads([])
       setSelectedTrip(null)
@@ -108,7 +128,14 @@ export function PaymentStatusForm({ trucks }: PaymentStatusFormProps) {
       // Initialize courier forms for each load
       const courierFormsInit: any = {}
       result.data.forEach((load: any) => {
-        const courier = load.courier_details?.[0] || {}
+        // Handle courier_details as array or object
+        let courier = load.courier_details
+        if (Array.isArray(courier)) {
+          courier = courier.length > 0 ? courier[0] : {}
+        } else if (!courier) {
+          courier = {}
+        }
+
         courierFormsInit[load.id] = {
           received_date: courier.received_date || "",
           vendor: courier.vendor || "",
@@ -212,6 +239,7 @@ export function PaymentStatusForm({ trucks }: PaymentStatusFormProps) {
 
       toast.success("Payment details saved successfully!")
       router.refresh()
+      if (onSuccess) onSuccess()
     } catch (error) {
       console.error(error)
       toast.error("An error occurred while saving")

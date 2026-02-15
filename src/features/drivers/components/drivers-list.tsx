@@ -28,6 +28,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { createDriver, updateDriver, deleteDriver } from "../actions"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { createDriverSchema, type CreateDriver } from "../schema"
 
 interface DriversListProps {
@@ -49,6 +50,9 @@ export function DriversList({ data }: DriversListProps) {
   })
   const [errors, setErrors] = useState<{ name?: string }>({})
   const [loading, setLoading] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [driverToDelete, setDriverToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const validateForm = (): boolean => {
     const newErrors: { name?: string } = {}
@@ -133,21 +137,29 @@ export function DriversList({ data }: DriversListProps) {
     setIsOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this driver?")) {
-      try {
-        const result = await deleteDriver(id)
-        if (result.success) {
-          toast.success("Driver deleted successfully!")
-          router.refresh()
-        } else {
-          toast.error(result.error || "Failed to delete driver")
-        }
-      } catch (error) {
-        console.error("Error deleting driver:", error)
-        toast.error("An error occurred while deleting the driver")
+  const confirmDelete = (id: string) => {
+    setDriverToDelete(id)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleDeleteConfirmed = async () => {
+    if (!driverToDelete) return
+    setIsDeleting(true)
+    try {
+      const result = await deleteDriver(driverToDelete)
+      if (result.success) {
+        toast.success("Driver deleted successfully!")
+        router.refresh()
+      } else {
+        toast.error(result.error || "Failed to delete driver")
       }
+    } catch (error) {
+      console.error("Error deleting driver:", error)
+      toast.error("An error occurred while deleting the driver")
     }
+    setIsDeleting(false)
+    setDeleteConfirmOpen(false)
+    setDriverToDelete(null)
   }
 
   const resetForm = () => {
@@ -165,6 +177,7 @@ export function DriversList({ data }: DriversListProps) {
   }
 
   return (
+    <>
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
@@ -316,7 +329,7 @@ export function DriversList({ data }: DriversListProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(driver.id)}
+                        onClick={() => confirmDelete(driver.id)}
                         className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -330,5 +343,14 @@ export function DriversList({ data }: DriversListProps) {
         )}
       </CardContent>
     </Card>
+    <DeleteConfirmationDialog
+      open={deleteConfirmOpen}
+      onOpenChange={setDeleteConfirmOpen}
+      onConfirm={handleDeleteConfirmed}
+      title="Delete Driver?"
+      description="Are you sure you want to delete this driver? This action cannot be undone."
+      isDeleting={isDeleting}
+    />
+    </>
   )
 }

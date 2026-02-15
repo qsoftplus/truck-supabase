@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/table"
 import { createMultipleTrucks, updateTruck, deleteTruck } from "../actions"
 import { createMultipleTrucksSchema } from "../schema"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 
 interface TrucksListProps {
   data: any[]
@@ -45,6 +46,9 @@ export function TrucksList({ data }: TrucksListProps) {
   const [trucks, setTrucks] = useState<TruckInput[]>([{ truck_no: "" }])
   const [editTruckNo, setEditTruckNo] = useState("")
   const [loading, setLoading] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [truckToDelete, setTruckToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const addTruckInput = () => {
     setTrucks([...trucks, { truck_no: "" }])
@@ -147,21 +151,29 @@ export function TrucksList({ data }: TrucksListProps) {
     setIsOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this truck?")) {
-      try {
-        const result = await deleteTruck(id)
-        if (result.success) {
-          toast.success("Truck deleted successfully!")
-          router.refresh()
-        } else {
-          toast.error(result.error || "Failed to delete truck")
-        }
-      } catch (error) {
-        console.error("Error deleting truck:", error)
-        toast.error("An error occurred while deleting the truck")
+  const confirmDelete = (id: string) => {
+    setTruckToDelete(id)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleDeleteConfirmed = async () => {
+    if (!truckToDelete) return
+    setIsDeleting(true)
+    try {
+      const result = await deleteTruck(truckToDelete)
+      if (result.success) {
+        toast.success("Truck deleted successfully!")
+        router.refresh()
+      } else {
+        toast.error(result.error || "Failed to delete truck")
       }
+    } catch (error) {
+      console.error("Error deleting truck:", error)
+      toast.error("An error occurred while deleting the truck")
     }
+    setIsDeleting(false)
+    setDeleteConfirmOpen(false)
+    setTruckToDelete(null)
   }
 
   const resetForm = () => {
@@ -171,6 +183,7 @@ export function TrucksList({ data }: TrucksListProps) {
   }
 
   return (
+    <>
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
@@ -292,7 +305,7 @@ export function TrucksList({ data }: TrucksListProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDelete(truck.id)}
+                        onClick={() => confirmDelete(truck.id)}
                         className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -306,5 +319,14 @@ export function TrucksList({ data }: TrucksListProps) {
         )}
       </CardContent>
     </Card>
+    <DeleteConfirmationDialog
+      open={deleteConfirmOpen}
+      onOpenChange={setDeleteConfirmOpen}
+      onConfirm={handleDeleteConfirmed}
+      title="Delete Truck?"
+      description="Are you sure you want to delete this truck? This action cannot be undone."
+      isDeleting={isDeleting}
+    />
+    </>
   )
 }

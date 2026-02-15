@@ -34,6 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { getTyres, createTyre, updateTyre, deleteTyre } from "@/features/tyres/actions"
 import { getTrucks } from "@/features/trucks/actions"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 
 interface TyreRecord {
   id: string
@@ -58,6 +59,9 @@ export function TyreDetailsView() {
   
   // Dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [tyreToDelete, setTyreToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [editingTyre, setEditingTyre] = useState<TyreRecord | null>(null)
   const [tyreForm, setTyreForm] = useState({
     truck_id: "",
@@ -184,17 +188,25 @@ export function TyreDetailsView() {
     }
   }
 
-  // Delete tyre
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this tyre record?")) return
-    
-    const result = await deleteTyre(id)
+  // Delete tyre confirm
+  const confirmDelete = (id: string) => {
+    setTyreToDelete(id)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleDeleteConfirmed = async () => {
+    if (!tyreToDelete) return
+    setIsDeleting(true)
+    const result = await deleteTyre(tyreToDelete)
     if (result.success) {
       toast.success("Tyre deleted successfully!")
-      setTyres(tyres.filter(t => t.id !== id))
+      setTyres(tyres.filter(t => t.id !== tyreToDelete))
     } else {
       toast.error(result.error || "Failed to delete tyre")
     }
+    setIsDeleting(false)
+    setDeleteConfirmOpen(false)
+    setTyreToDelete(null)
   }
 
   // Get truck name by ID
@@ -336,7 +348,7 @@ export function TyreDetailsView() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDelete(tyre.id)}
+                              onClick={() => confirmDelete(tyre.id)}
                             >
                               <Trash2 className="h-4 w-4 text-red-600" />
                             </Button>
@@ -494,6 +506,15 @@ export function TyreDetailsView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <DeleteConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={handleDeleteConfirmed}
+        title="Delete Tyre Record?"
+        description="Are you sure you want to delete this tyre record? This action cannot be undone."
+        isDeleting={isDeleting}
+      />
     </div>
   )
 }

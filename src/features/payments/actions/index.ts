@@ -51,6 +51,7 @@ export async function getPendingPayments() {
     .select(`
       *,
       trips (
+        id,
         start_date,
         end_date,
         trucks (truck_no),
@@ -58,8 +59,9 @@ export async function getPendingPayments() {
       ),
       courier_details (*)
     `)
-    .gt("balance_amount", 0)
     .order("loading_date", { ascending: false })
+    // Removed .gt("balance_amount", 0) so we see all loads and can manage them.
+    // The UI can filter if needed, or we show 0 balance as "Paid".
 
   if (error) {
     console.error("Error fetching pending payments:", error)
@@ -68,6 +70,11 @@ export async function getPendingPayments() {
 
   return { success: true, data }
 }
+
+// Update `getPendingPayments` to sort by trip date if possible, otherwise we sort in client.
+// No changes needed in actions.ts for now, as we do client side grouping.
+// However, I will check if `deleteLoad` is accessible.
+// I'll proceed to editing the view.
 
 // Update load payment details
 export async function updateLoadPayment(input: {

@@ -46,6 +46,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { TripDetail } from "./trip-detail"
 import { deleteTrip } from "../actions"
+import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import React from "react"
 
 interface TripsListProps {
@@ -58,6 +59,9 @@ export function TripsList({ trips, trucks, drivers }: TripsListProps) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [selectedTrip, setSelectedTrip] = useState<any | null>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [tripToDelete, setTripToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [expandedTrips, setExpandedTrips] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -116,16 +120,33 @@ export function TripsList({ trips, trucks, drivers }: TripsListProps) {
     setIsOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this trip? All loads and expenses will also be deleted.")) {
-      const result = await deleteTrip(id)
-      if (result.success) {
-        toast.success("Trip deleted successfully!")
-        router.refresh()
-      } else {
-        toast.error(result.error || "Failed to delete trip")
-      }
+  const confirmDelete = (id: string) => {
+    setTripToDelete(id)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleDeleteConfirmed = async () => {
+    if (!tripToDelete) return
+    setIsDeleting(true)
+    
+    // Optimistic update or just wait for refresh? 
+    // Usually action returns success, then we refresh.
+    // To avoid flicker, we can optimistically remove?
+    // But pagination logic relies on props.
+    // Just refresh.
+    
+    const result = await deleteTrip(tripToDelete)
+    
+    if (result.success) {
+      toast.success("Trip deleted successfully!")
+      router.refresh()
+    } else {
+      toast.error(result.error || "Failed to delete trip")
     }
+    
+    setIsDeleting(false)
+    setDeleteConfirmOpen(false)
+    setTripToDelete(null)
   }
 
   const handleSuccess = () => {
@@ -287,7 +308,7 @@ export function TripsList({ trips, trucks, drivers }: TripsListProps) {
                               <DropdownMenuItem onClick={() => handleViewTrip(trip)}>
                                 <Pencil className="mr-2 h-4 w-4" /> Edit / View
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(trip.id)}>
+                              <DropdownMenuItem className="text-red-600" onClick={() => confirmDelete(trip.id)}>
                                 <Trash2 className="mr-2 h-4 w-4" /> Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -420,6 +441,15 @@ export function TripsList({ trips, trucks, drivers }: TripsListProps) {
           />
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmationDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={handleDeleteConfirmed}
+        title="Delete Trip?"
+        description="Are you sure you want to delete this trip? All loads and expenses will also be deleted. This action cannot be undone."
+        isDeleting={isDeleting}
+      />
     </>
   )
 }
