@@ -55,8 +55,6 @@ export function TyreDetailsView() {
   
   // Filters
   const [filterTruckId, setFilterTruckId] = useState("")
-  const [filterStartDate, setFilterStartDate] = useState("")
-  const [filterEndDate, setFilterEndDate] = useState("")
   
   // Dialog state
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -91,7 +89,7 @@ export function TyreDetailsView() {
 
   const fetchTyres = async () => {
     setLoading(true)
-    const result = await getTyres(filterTruckId, filterStartDate, filterEndDate)
+    const result = await getTyres(filterTruckId, "", "")
     if (result.success && result.data) {
       setTyres(result.data)
     } else {
@@ -104,7 +102,7 @@ export function TyreDetailsView() {
   const calculateStats = (tyre: TyreRecord) => {
     const runningKm = Math.max(0, (tyre.removal_km || 0) - (tyre.fitting_km || 0))
     const costPerKm = runningKm > 0 && tyre.price > 0 
-      ? (tyre.price / runningKm).toFixed(2) 
+      ? (runningKm / tyre.price).toFixed(2) 
       : "0.00"
     return { runningKm, costPerKm }
   }
@@ -232,19 +230,20 @@ export function TyreDetailsView() {
         </Button>
       </div>
 
-      {/* Filter Section */}
+      {/* Tyre Records Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Filter Records</CardTitle>
-          <CardDescription>Filter tyre records by truck and date range</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-            {/* Truck Filter */}
-            <div className="space-y-2">
-              <Label>Truck No</Label>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle>Tyre Records</CardTitle>
+              <CardDescription>
+                {tyres.length} records found
+                {filterTruckId && filterTruckId !== "all" && ` for ${getTruckName(filterTruckId)}`}
+              </CardDescription>
+            </div>
+            <div className="w-[200px]">
               <Select value={filterTruckId} onValueChange={setFilterTruckId}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-slate-100">
                   <SelectValue placeholder="All Trucks" />
                 </SelectTrigger>
                 <SelectContent>
@@ -256,46 +255,6 @@ export function TyreDetailsView() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* Start Date */}
-            <div className="space-y-2">
-              <Label>Start Date</Label>
-              <Input
-                type="date"
-                value={filterStartDate}
-                onChange={(e) => setFilterStartDate(e.target.value)}
-              />
-            </div>
-
-            {/* End Date */}
-            <div className="space-y-2">
-              <Label>End Date</Label>
-              <Input
-                type="date"
-                value={filterEndDate}
-                onChange={(e) => setFilterEndDate(e.target.value)}
-              />
-            </div>
-
-            {/* Search Button */}
-            <Button onClick={fetchTyres} variant="outline">
-              <Search className="h-4 w-4 mr-2" /> Search
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tyre Records Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Tyre Records</CardTitle>
-              <CardDescription>
-                {tyres.length} records found
-                {filterTruckId && filterTruckId !== "all" && ` for ${getTruckName(filterTruckId)}`}
-              </CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -502,7 +461,7 @@ export function TyreDetailsView() {
                 {(() => {
                   const runningKm = Math.max(0, (tyreForm.removal_km || 0) - (tyreForm.fitting_km || 0))
                   if (runningKm > 0 && tyreForm.price > 0) {
-                    return `₹${(tyreForm.price / runningKm).toFixed(2)} per km`
+                    return `₹${(runningKm / tyreForm.price).toFixed(2)} per km`
                   }
                   return "— (Enter price and removal KM)"
                 })()}

@@ -136,6 +136,9 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
   const [newDriverName, setNewDriverName] = useState("")
   const [addingDriverFor, setAddingDriverFor] = useState<"driver1" | "driver2">("driver1")
 
+  // Delete load state
+  const [deleteLoadId, setDeleteLoadId] = useState<string | null>(null)
+
   // Initialize expense form from existing expenses
   useEffect(() => {
     if (trip?.expenses && trip.expenses.length > 0) {
@@ -199,7 +202,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
   // Calculate salary amount based on percentage
   const calculatedSalary = useMemo(() => {
     if (expenseForm.salary_percentage <= 0) return 0
-    return Math.round(totalFreight / expenseForm.salary_percentage)
+    return Math.round((totalFreight * expenseForm.salary_percentage) / 100)
   }, [totalFreight, expenseForm.salary_percentage])
 
   // Calculate billing total
@@ -234,7 +237,19 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
 
   // Handle trip field change
   const handleTripChange = (field: string, value: any) => {
-    setTripData(prev => ({ ...prev, [field]: value }))
+    // Auto-update status based on end_date
+    if (field === "end_date") {
+      const today = new Date().toISOString().split("T")[0]
+      const newStatus = value && value <= today ? "completed" : "ongoing"
+      
+      setTripData(prev => ({
+        ...prev,
+        [field]: value,
+        status: newStatus
+      }))
+    } else {
+      setTripData(prev => ({ ...prev, [field]: value }))
+    }
   }
 
   // Handle adding a new driver
@@ -265,43 +280,85 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
 
   // Handle load form submission
   const handleSaveLoad = async () => {
-    if (!tripData.id) {
-      toast.error("Please save the trip first before adding loads")
-      return
-    }
+
 
     // Validate loading date
     if (loadForm.loading_date) {
-      const validation = await validateLoadingDate(tripData.id, loadForm.loading_date)
-      if (!validation.valid) {
-        toast.error(validation.error)
-        return
+      if (tripData.id) {
+        // Validate against DB if trip exists
+        const validation = await validateLoadingDate(tripData.id, loadForm.loading_date)
+        if (!validation.valid) {
+          toast.error(validation.error)
+          return
+        }
+      } else {
+        // Validate locally if new trip
+        const loadDate = new Date(loadForm.loading_date)
+        const startDate = new Date(tripData.start_date)
+        const endDate = tripData.end_date ? new Date(tripData.end_date) : null
+
+        if (loadDate < startDate) {
+          toast.error(`Loading date cannot be before trip start date (${tripData.start_date})`)
+          return
+        }
+        if (endDate && loadDate > endDate) {
+          toast.error(`Loading date cannot be after trip end date (${tripData.end_date})`)
+          return
+        }
       }
     }
 
+
+
     setLoading(true)
     try {
-      if (editingLoad) {
-        const result = await updateLoad({
-          id: editingLoad.id,
-          ...loadForm,
-        })
-        if (result.success) {
-          setLoads(prev => prev.map(l => l.id === editingLoad.id ? result.data : l))
-          toast.success("Load updated successfully!")
+      const payload = {
+        ...loadForm,
+        pay_term: "To Pay",
+        advance_amount: 0,
+        balance_amount: loadForm.freight_amount
+      }
+
+      // If no trip ID, save locally only
+      if (!tripData.id) {
+        const newLoad = {
+          id: editingLoad ? editingLoad.id : crypto.randomUUID(),
+          trip_id: "temp",
+          ...payload,
+          created_at: new Date().toISOString()
+        }
+
+        if (editingLoad) {
+          setLoads(prev => prev.map(l => l.id === editingLoad.id ? newLoad : l))
+          toast.success("Load updated (Draft)")
         } else {
-          toast.error(result.error || "Failed to update load")
+          setLoads(prev => [...prev, newLoad])
+          toast.success("Load added (Draft)")
         }
       } else {
-        const result = await createLoad({
-          trip_id: tripData.id,
-          ...loadForm,
-        })
-        if (result.success) {
-          setLoads(prev => [...prev, result.data])
-          toast.success("Load added successfully!")
+        // Existing trip - save to DB
+        if (editingLoad) {
+          const result = await updateLoad({
+            id: editingLoad.id,
+            ...payload,
+          })
+          if (result.success) {
+            setLoads(prev => prev.map(l => l.id === editingLoad.id ? result.data : l))
+            toast.success("Load updated successfully!")
+          } else {
+            toast.error(result.error || "Failed to update load")
+          }
         } else {
-          toast.error(result.error || "Failed to add load")
+          const result = await createLoad({
+            trip_id: tripData.id,
+            ...payload,
+          })
+          if (result.success) {
+            setLoads(prev => [...prev, result.data])
+            toast.success("Load added successfully!")
+          } else {
+            toast.error(result.error || "Failed to add load")
+          }
         }
       }
       
@@ -325,16 +382,30 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
   }
 
   // Handle delete load
-  const handleDeleteLoad = async (loadId: string) => {
-    if (!confirm("Are you sure you want to delete this load?")) return
-    
-    const result = await deleteLoad(loadId)
+  const handleDeleteLoad = (loadId: string) => {
+    setDeleteLoadId(loadId)
+  }
+
+  // Confirm delete load
+  const confirmDeleteLoad = async () => {
+    if (!deleteLoadId) return
+
+    // If local draft (no trip id yet), just remove from state
+    if (!tripData.id) {
+      setLoads(prev => prev.filter(l => l.id !== deleteLoadId))
+      toast.success("Load deleted (Draft)")
+      setDeleteLoadId(null)
+      return
+    }
+
+    const result = await deleteLoad(deleteLoadId)
     if (result.success) {
-      setLoads(prev => prev.filter(l => l.id !== loadId))
+      setLoads(prev => prev.filter(l => l.id !== deleteLoadId))
       toast.success("Load deleted successfully!")
     } else {
       toast.error(result.error || "Failed to delete load")
     }
+    setDeleteLoadId(null)
   }
 
   // Handle edit load
@@ -435,7 +506,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
         end_km: tripData.end_km || null,
         diesel_liters: tripData.diesel_liters,
         diesel_amount: expenseForm.diesel_amount,
-        status: tripData.status,
+        status: tripData.end_date && tripData.end_date <= new Date().toISOString().split("T")[0] ? "completed" : "ongoing",
       }
 
       if (tripData.id) {
@@ -454,6 +525,19 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
         }
         savedTripId = result.data.id
         setTripData(prev => ({ ...prev, id: savedTripId }))
+
+        // Save any draft loads
+        if (loads.length > 0) {
+          const loadPromises = loads.map(load => {
+            const { id, trip_id, created_at, ...loadData } = load // Remove temp ID
+            return createLoad({
+              ...loadData,
+              trip_id: savedTripId
+            })
+          })
+          
+          await Promise.all(loadPromises)
+        }
       }
 
       // Save expenses
@@ -623,19 +707,10 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
             </div>
 
             <div className="space-y-2">
-              <Label>Status</Label>
-              <Select 
-                value={tripData.status} 
-                onValueChange={(val) => handleTripChange("status", val)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ongoing">Ongoing</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Status (Auto)</Label>
+              <div className={`h-10 px-3 py-2 border rounded-md flex items-center font-medium ${tripData.status === "completed" ? "bg-green-50 text-green-700" : "bg-blue-50 text-blue-700"}`}>
+                {tripData.status === "completed" ? "Completed" : "Active"}
+              </div>
             </div>
           </div>
 
@@ -732,7 +807,11 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
               <Input
                 type="number"
                 value={tripData.diesel_liters || ""}
-                onChange={(e) => handleTripChange("diesel_liters", Number(e.target.value))}
+                onChange={(e) => {
+                  const val = Number(e.target.value)
+                  handleTripChange("diesel_liters", val)
+                  setExpenseForm(prev => ({ ...prev, diesel_liters: val }))
+                }}
                 placeholder="0"
               />
             </div>
@@ -866,7 +945,11 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
                   <Input
                     type="number"
                     value={expenseForm.diesel_liters || ""}
-                    onChange={(e) => setExpenseForm(prev => ({ ...prev, diesel_liters: Number(e.target.value) }))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      setExpenseForm(prev => ({ ...prev, diesel_liters: val }))
+                      handleTripChange("diesel_liters", val)
+                    }}
                     placeholder="0"
                   />
                 </div>
@@ -931,7 +1014,7 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
                 </div>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Calculated Amount (Freight ÷ %)</Label>
+                <Label className="text-xs">Calculated Amount (Freight * %)</Label>
                 <div className="h-10 px-3 py-2 border rounded-md bg-green-50 text-green-700 flex items-center font-medium">
                   ₹{calculatedSalary.toLocaleString()}
                 </div>
@@ -1174,34 +1257,9 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
                   placeholder="0"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Pay Term</Label>
-                <Select 
-                  value={loadForm.pay_term}
-                  onValueChange={(val: "To Pay" | "Advance") => setLoadForm(prev => ({ ...prev, pay_term: val }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="To Pay">To Pay</SelectItem>
-                    <SelectItem value="Advance">Advance</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
 
-            {loadForm.pay_term === "Advance" && (
-              <div className="space-y-2">
-                <Label>Advance Amount (₹)</Label>
-                <Input
-                  type="number"
-                  value={loadForm.advance_amount || ""}
-                  onChange={(e) => setLoadForm(prev => ({ ...prev, advance_amount: Number(e.target.value) }))}
-                  placeholder="0"
-                />
-              </div>
-            )}
+
 
             <div className="space-y-2">
               <Label>Note</Label>
@@ -1251,6 +1309,26 @@ export function TripDetail({ trip, trucks, drivers, onSuccess }: TripDetailProps
               Add Driver
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Load Confirmation Dialog */}
+      <Dialog open={!!deleteLoadId} onOpenChange={(open) => !open && setDeleteLoadId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Load</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this load? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="outline" onClick={() => setDeleteLoadId(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDeleteLoad} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
